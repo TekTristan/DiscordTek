@@ -1,14 +1,30 @@
 import asyncio
-from cgitb import text
+import requests
+import json
 import random
-import nextcord 
+import nextcord
 import youtube_dl
 from gtts import gTTS
 from nextcord.ext import commands
 
-intents = nextcord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+
+def translate(text, target_language):
+    api_key = "YOUR_API_KEY"
+    base_url = "https://translation.googleapis.com/language/translate/v2"
+    headers = {
+        "Content-Type": "application/json",
+    }
+    data = {
+        "q": text,
+        "target": target_language,
+    }
+    response = requests.post(
+        base_url, headers=headers, json=data, params={"key": api_key}
+    )
+    if response.status_code == 200:
+        return json.loads(response.content)["data"]["translations"][0]["translatedText"]
+    else:
+        return "Error: the translation service is currently unavailable."
 
 
 youtube_dl.utils.bug_reports_message = lambda: ""
@@ -24,7 +40,7 @@ ytdl_format_options = {
     "quiet": True,
     "no_warnings": True,
     "default_search": "auto",
-    "source_address": "0.0.0.0", 
+    "source_address": "0.0.0.0",
 }
 
 ffmpeg_options = {"options": "-vn"}
@@ -45,7 +61,9 @@ class YTDLSource(nextcord.PCMVolumeTransformer):
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=False):
         loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+        data = await loop.run_in_executor(
+            None, lambda: ytdl.extract_info(url, download=not stream)
+        )
 
         if "entries" in data:
             data = data["entries"][0]
@@ -68,7 +86,9 @@ class Music(commands.Cog):
     @commands.command()
     async def play(self, ctx, *, query):
         source = nextcord.PCMVolumeTransformer(nextcord.FFmpegPCMAudio(query))
-        ctx.voice_client.play(source, after=lambda e: print(f"Player error: {e}") if e else None)
+        ctx.voice_client.play(
+            source, after=lambda e: print(f"Player error: {e}") if e else None
+        )
 
         await ctx.send(f"Now playing: {query}")
 
@@ -120,7 +140,9 @@ class Music(commands.Cog):
             if vc.is_playing():
                 vc.stop()
 
-            source = await nextcord.FFmpegOpusAudio.from_probe("tts-audio.mp3", method="fallback")
+            source = await nextcord.FFmpegOpusAudio.from_probe(
+                "tts-audio.mp3", method="fallback"
+            )
             vc.play(source)
         else:
             await ctx.send("You need to be in a vc to run this command!")
@@ -138,19 +160,25 @@ class Music(commands.Cog):
         elif ctx.voice_client.is_playing():
             ctx.voice_client.stop()
 
+
 @bot.event
 async def on_ready():
-    await bot.change_presence(status=nextcord.Status.dnd, activity=nextcord.Game('Just Gaming'))
+    await bot.change_presence(
+        status=nextcord.Status.dnd, activity=nextcord.Game("Just Gaming")
+    )
     print("Bot Is Online!")
 
 
 @commands.command(aliases=["membercount"])
 async def members(self, ctx):
-    await ctx.send(f'{ctx.guild.member_count}')
+    await ctx.send(f"{ctx.guild.member_count}")
+
 
 @commands.command()
 async def Ping(self, ctx):
     await ctx.reply(f"Pong! {round(bot.latency * 1000)}ms")
 
+
 bot.add_cog(Music(bot))
 bot.run("YOURTOKEN")
+
